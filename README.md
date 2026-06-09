@@ -8,3 +8,13 @@ Curve CSS is a Blender add-on that enables the extraction, conversion, and reapp
 
 The tool natively supports generating either linear() functions or sampled values. Beyond exporting, Curve CSS allows users to reset Float Curves or paste previously saved curve data back into new or existing nodes. This enables consistent easing patterns and curve shapes to be transferred between different parts of a project or across entirely different Blender sessions.
 
+# Installation
+Download the ZIP file.
+
+Open Blender and go to **Edit** > **Preferences** > **Add-ons**.
+
+Click **Install**, select the ZIP file, and click **Install Add-on**.
+
+Enable the add-on by checking the corresponding box.
+
+Access **Float Curve Tools** in the **N menu** (sidebar) under the **Float Curve**.
