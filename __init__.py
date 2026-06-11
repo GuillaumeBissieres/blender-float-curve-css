@@ -11,58 +11,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# =====================================================
-# Float Curve Tools
-# =====================================================
-# Unified addon:
-# - Float Curve Tools (Node Editor)
-# - Curve Profile Tools (View3D)
-# - Float Curve Export (Node Editor → Curve Object)
-#
-# Author: Guillaume Bissieres
-# =====================================================
-
-bl_info = {
-    "name": "Float Curve Tools",
-    "author": "Guillaume Bissieres",
-    "version": (1, 2, 0),
-    "blender": (4, 5, 0),
-    "location": "Node Editor > Sidebar | View3D > Sidebar",
-    "description": (
-        "Advanced Float Curve editing tools (copy / paste, flip, stretch, "
-        "domain mirror, proper point redistribution) combined with smart "
-        "Curve Profile to Float Curve conversion and Float Curve to Curve export."
-    ),
-    "doc_url": "https://bissieres.gumroad.com/l/CurveCss",
-    "tracker_url": "https://github.com/GuillaumeBissieres/blender-float-curve-css",
-    "category": "Node",
-}
+# NOTE: bl_info removed - blender_manifest.toml is the single source of
+# metadata for Blender 4.2+ extensions.
 
 import bpy
-
-# -----------------------------------------------------
-# Import submodules
-# -----------------------------------------------------
 from . import float_curve_tools
 from . import curve_profile_tools
 from . import float_curve_export
-
-
-# =====================================================
-# REGISTER
-# =====================================================
 
 def register():
     float_curve_tools.register()
     curve_profile_tools.register()
     float_curve_export.register()
 
-
 def unregister():
     float_curve_export.unregister()
     curve_profile_tools.unregister()
     float_curve_tools.unregister()
-
 
 if __name__ == "__main__":
     register()
