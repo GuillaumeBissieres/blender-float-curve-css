@@ -13,7 +13,6 @@
 
 # ==========================================================
 # Float Curve Tools - Node Editor
-# (bl_info intentionally removed, handled by __init__.py)
 # ==========================================================
 
 import bpy
@@ -46,25 +45,19 @@ def find_selected_float_curve_node():
 # ==========================================================
 def extract_curve_points(mapping):
     curve = mapping.curves[0]
-    return [{
-        "x": float(p.location[0]),
-        "y": float(p.location[1]),
-        "type": getattr(p, "handle_type", "FREE")
-    } for p in curve.points]
+    return [{"x": float(p.location[0]), "y": float(p.location[1]),
+              "type": getattr(p, "handle_type", "FREE")} for p in curve.points]
 
 def apply_curve_points(mapping, data):
     curve = mapping.curves[0]
-
     while len(curve.points) > 2:
         curve.points.remove(curve.points[-1])
-
     if len(curve.points) < 2:
         curve.points.new(data[0]["x"], data[0]["y"])
         curve.points.new(data[-1]["x"], data[-1]["y"])
 
     curve.points[0].location = (data[0]["x"], data[0]["y"])
     curve.points[0].handle_type = data[0]["type"]
-
     curve.points[1].location = (data[-1]["x"], data[-1]["y"])
     curve.points[1].handle_type = data[-1]["type"]
 
@@ -81,7 +74,6 @@ def flip_curve(mapping, mode):
     global ORIGINAL_POINTS
     data = extract_curve_points(mapping)
     ORIGINAL_POINTS = data.copy()
-
     flipped = []
     for p in data:
         x, y = p["x"], p["y"]
@@ -89,8 +81,11 @@ def flip_curve(mapping, mode):
             x = 1.0 - x
         elif mode == 'VERTICAL':
             y = 1.0 - y
+        elif mode == 'DOMAIN':
+            x = 1.0 - x
         flipped.append({"x": x, "y": y, "type": p["type"]})
-
+    if mode == 'DOMAIN':
+        flipped = list(reversed(flipped))
     apply_curve_points(mapping, flipped)
     ORIGINAL_POINTS = flipped.copy()
 
@@ -98,72 +93,31 @@ def stretch_curve(mapping, scale_x=1.0, scale_y=1.0):
     global ORIGINAL_POINTS
     if not ORIGINAL_POINTS:
         ORIGINAL_POINTS = extract_curve_points(mapping)
-
     cx, cy = 0.5, 0.5
-    stretched = []
-
-    for p in ORIGINAL_POINTS:
-        stretched.append({
-            "x": cx + (p["x"] - cx) * scale_x,
-            "y": cy + (p["y"] - cy) * scale_y,
-            "type": p["type"]
-        })
-
+    stretched = [{"x": cx + (p["x"] - cx) * scale_x,
+                  "y": cy + (p["y"] - cy) * scale_y,
+                  "type": p["type"]} for p in ORIGINAL_POINTS]
     apply_curve_points(mapping, stretched)
 
-def flip_curve_domain_x(mapping):
-    data = extract_curve_points(mapping)
-
-    mirrored = []
-    for p in reversed(data):
-        mirrored.append({
-            "x": 1.0 - p["x"],
-            "y": p["y"],
-            "type": p["type"]
-        })
-
-    apply_curve_points(mapping, mirrored)
-
-# ==========================================================
-# TRUE POINT REDISTRIBUTION
-# ==========================================================
 def redistribute_curve_points(mapping, factor=0.0):
     global ORIGINAL_POINTS
-
     if not ORIGINAL_POINTS:
         ORIGINAL_POINTS = extract_curve_points(mapping)
-
     pts = ORIGINAL_POINTS
     count = len(pts)
-
     if count < 3:
         return
-
-    min_x = pts[0]["x"]
-    max_x = pts[-1]["x"]
+    min_x, max_x = pts[0]["x"], pts[-1]["x"]
     length = max_x - min_x
-
     if length == 0:
         return
-
     inner_count = count - 2
-    uniform_x = [
-        min_x + (i + 1) * length / (inner_count + 1)
-        for i in range(inner_count)
-    ]
-
+    uniform_x = [min_x + (i + 1) * length / (inner_count + 1) for i in range(inner_count)]
     redistributed = [pts[0]]
-
     for i in range(inner_count):
         p = pts[i + 1]
-        target_x = uniform_x[i]
-        x = p["x"] * (1.0 - factor) + target_x * factor
-        redistributed.append({
-            "x": x,
-            "y": p["y"],
-            "type": p["type"]
-        })
-
+        x = p["x"] * (1.0 - factor) + uniform_x[i] * factor
+        redistributed.append({"x": x, "y": p["y"], "type": p["type"]})
     redistributed.append(pts[-1])
     apply_curve_points(mapping, redistributed)
 
@@ -173,19 +127,13 @@ def redistribute_curve_points(mapping, factor=0.0):
 def update_curve_stretch(self, context):
     node = find_selected_float_curve_node()
     if node:
-        stretch_curve(
-            node.mapping,
-            context.scene.float_curve_stretch_x,
-            context.scene.float_curve_stretch_y
-        )
+        stretch_curve(node.mapping, context.scene.float_curve_stretch_x,
+                      context.scene.float_curve_stretch_y)
 
 def update_curve_redistribute(self, context):
     node = find_selected_float_curve_node()
     if node:
-        redistribute_curve_points(
-            node.mapping,
-            context.scene.float_curve_redistribute
-        )
+        redistribute_curve_points(node.mapping, context.scene.float_curve_redistribute)
 
 # ==========================================================
 # OPERATORS
@@ -193,77 +141,93 @@ def update_curve_redistribute(self, context):
 class NODE_OT_copy_float_curve_points(bpy.types.Operator):
     bl_idname = "node.copy_float_curve_points"
     bl_label = "Copy Curve"
+    bl_description = "Copy all points of the currently active Float Curve node. Use Apply Curve afterwards to paste them onto any other Float Curve node (empty or not)"
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         global STORED_POINTS, ORIGINAL_POINTS
         node = find_selected_float_curve_node()
         if not node:
+            self.report({'ERROR'}, "No Float Curve node selected")
             return {'CANCELLED'}
-
         STORED_POINTS = extract_curve_points(node.mapping)
         ORIGINAL_POINTS = STORED_POINTS.copy()
-
         context.scene.float_curve_tools_text = json.dumps(STORED_POINTS)
         context.scene.float_curve_stretch_x = 1.0
         context.scene.float_curve_stretch_y = 1.0
         context.scene.float_curve_redistribute = 0.0
-
         return {'FINISHED'}
+
 
 class NODE_OT_apply_float_curve_points(bpy.types.Operator):
     bl_idname = "node.apply_float_curve_points"
     bl_label = "Apply Curve"
+    bl_description = "Apply the previously copied Float Curve points onto the currently active Float Curve node. Select the target node first, then click Apply"
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         node = find_selected_float_curve_node()
-        if node and STORED_POINTS:
-            apply_curve_points(node.mapping, STORED_POINTS)
+        if not node:
+            self.report({'ERROR'}, "No Float Curve node selected")
+            return {'CANCELLED'}
+        if not STORED_POINTS:
+            self.report({'ERROR'}, "No curve data copied yet. Use Copy Curve first")
+            return {'CANCELLED'}
+        apply_curve_points(node.mapping, STORED_POINTS)
         return {'FINISHED'}
+
 
 class NODE_OT_apply_from_text(bpy.types.Operator):
     bl_idname = "node.apply_float_curve_from_text"
     bl_label = "Apply From Text"
+    bl_description = "Apply curve points from the JSON text field below onto the active Float Curve node"
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         try:
             data = ast.literal_eval(context.scene.float_curve_tools_text)
         except Exception:
+            self.report({'ERROR'}, "Invalid curve data in the text field")
             return {'CANCELLED'}
-
         node = find_selected_float_curve_node()
-        if node:
-            apply_curve_points(node.mapping, data)
+        if not node:
+            self.report({'ERROR'}, "No Float Curve node selected")
+            return {'CANCELLED'}
+        apply_curve_points(node.mapping, data)
         return {'FINISHED'}
 
-class NODE_OT_flip_curve_vertical(bpy.types.Operator):
-    bl_idname = "node.flip_float_curve_vertical"
-    bl_label = "Flip Vertical"
+
+class NODE_OT_flip_float_curve(bpy.types.Operator):
+    """Flip the active Float Curve node"""
+    bl_idname = "node.flip_float_curve"
+    bl_label = "Flip Domain"
+    bl_description = (
+        "Flip the active Float Curve node. "
+        "Vertical: flip values upside down (Y axis). "
+        "Horizontal: mirror left to right (X axis). "
+        "Domain: visual mirror with point order reversal"
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(
+        name="Mode",
+        description="Flip axis or domain",
+        items=[
+            ('VERTICAL',    "Vertical",     "Flip the curve values upside down (Y axis)"),
+            ('HORIZONTAL',  "Horizontal",   "Mirror the curve left to right (X axis)"),
+            ('DOMAIN',      "Domain",       "Flip the curve along its domain (visual mirror with point reversal)"),
+        ],
+        default='VERTICAL',
+    )
 
     def execute(self, context):
         node = find_selected_float_curve_node()
-        if node:
-            flip_curve(node.mapping, 'VERTICAL')
+        if not node:
+            self.report({'ERROR'}, "No Float Curve node selected")
+            return {'CANCELLED'}
+        flip_curve(node.mapping, self.mode)
         return {'FINISHED'}
 
-class NODE_OT_flip_curve_horizontal(bpy.types.Operator):
-    bl_idname = "node.flip_float_curve_horizontal"
-    bl_label = "Flip Horizontal"
-
-    def execute(self, context):
-        node = find_selected_float_curve_node()
-        if node:
-            flip_curve(node.mapping, 'HORIZONTAL')
-        return {'FINISHED'}
-
-class NODE_OT_flip_curve_domain_x(bpy.types.Operator):
-    bl_idname = "node.flip_float_curve_domain_x"
-    bl_label = "Flip Domain (Visual)"
-
-    def execute(self, context):
-        node = find_selected_float_curve_node()
-        if node:
-            flip_curve_domain_x(node.mapping)
-        return {'FINISHED'}
 
 # ==========================================================
 # UI
@@ -282,12 +246,7 @@ class NODE_PT_float_curve_css(bpy.types.Panel):
         layout.operator("node.apply_float_curve_points", icon='PASTEDOWN')
 
         layout.separator()
-        layout.label(text="Points:")
-        row = layout.row(align=True)
-        row.operator("node.flip_float_curve_vertical")
-        row.operator("node.flip_float_curve_horizontal")
-
-        layout.operator("node.flip_float_curve_domain_x", icon='ARROW_LEFTRIGHT')
+        layout.operator("node.flip_float_curve", text="Flip Domain", icon='ARROW_LEFTRIGHT')
 
         layout.separator()
         layout.label(text="Stretch:")
@@ -303,6 +262,7 @@ class NODE_PT_float_curve_css(bpy.types.Panel):
         layout.prop(context.scene, "float_curve_tools_text", text="")
         layout.operator("node.apply_float_curve_from_text", icon='FILE_TICK')
 
+
 # ==========================================================
 # REGISTER
 # ==========================================================
@@ -310,31 +270,24 @@ classes = (
     NODE_OT_copy_float_curve_points,
     NODE_OT_apply_float_curve_points,
     NODE_OT_apply_from_text,
-    NODE_OT_flip_curve_vertical,
-    NODE_OT_flip_curve_horizontal,
-    NODE_OT_flip_curve_domain_x,
+    NODE_OT_flip_float_curve,
     NODE_PT_float_curve_css,
 )
 
 def register():
     for c in classes:
         bpy.utils.register_class(c)
-
     bpy.types.Scene.float_curve_tools_text = bpy.props.StringProperty(default="")
     bpy.types.Scene.float_curve_stretch_x = bpy.props.FloatProperty(
-        default=1.0, min=0.01, max=5.0, update=update_curve_stretch
-    )
+        default=1.0, min=0.01, max=5.0, update=update_curve_stretch)
     bpy.types.Scene.float_curve_stretch_y = bpy.props.FloatProperty(
-        default=1.0, min=0.01, max=5.0, update=update_curve_stretch
-    )
+        default=1.0, min=0.01, max=5.0, update=update_curve_stretch)
     bpy.types.Scene.float_curve_redistribute = bpy.props.FloatProperty(
-        default=0.0, min=0.0, max=1.0, update=update_curve_redistribute
-    )
+        default=0.0, min=0.0, max=1.0, update=update_curve_redistribute)
 
 def unregister():
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
-
     del bpy.types.Scene.float_curve_tools_text
     del bpy.types.Scene.float_curve_stretch_x
     del bpy.types.Scene.float_curve_stretch_y
