@@ -35,6 +35,9 @@ Access **Float Curve Tools** in the **N menu** (sidebar) under the **Float Curve
      the curve domain using a blend slider.
 
 # How to Use Curve Profile (3D Viewport)
+
+<img width="1545" height="969" alt="Flat_curve_css_tuto1" src="https://github.com/user-attachments/assets/64638aab-6ce2-408b-a578-347b1c02c674" />
+
 1. **Create or edit a Curve object** in the 3D Viewport to define the 
    desired profile shape.
 2. **Register the Curve** : Click **Register Curve Profile** to add it to 
