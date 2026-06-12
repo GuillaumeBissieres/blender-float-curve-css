@@ -20,6 +20,9 @@ Enable the add-on by checking the corresponding box.
 Access **Float Curve Tools** in the **N menu** (sidebar) under the **Float Curve**.
 
 # How to Use Float Curve Tools (Node Editor)
+
+<img width="1545" height="969" alt="Flat_curve_css_tuto2" src="https://github.com/user-attachments/assets/8138256c-b482-4dbd-bbf8-00aa16e6cffa" />
+
 1. **Select a Float Curve node** in the Geometry Nodes editor.
 2. **Choose the action**:
    - **Copy Curve** : Copies all points of the active Float Curve node. 
